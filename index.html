@@ -13,13 +13,11 @@
         .input-field {
             @apply w-full px-3 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-200;
         }
-        /* Explicitly style text inputs for the dark theme */
         input[type="text"].input-field, input[type="number"].input-field {
             background-color: #374151; /* gray-700 */
             border-color: #4B5563;   /* gray-600 */
             color: white;
         }
-        /* Override for select dropdowns to a light theme to ensure option visibility */
         select.input-field {
             background-color: #F9FAFB; /* gray-50 */
             border-color: #9CA3AF;   /* gray-400 */
@@ -111,7 +109,7 @@
                 "aggregation_add_member": { name: "Aggregation Add Member", base: "aggregation add agg <agg_name> port <port_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }, { name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1" }] },
                 "aggregation_remove_member": { name: "Aggregation Remove Member", base: "aggregation remove agg <agg_name> port <port_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }, { name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1" }] },
                 "aggregation_delete": { name: "Aggregation Delete", base: "aggregation delete agg <agg_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }] },
-                 "aggregation_set_revert": { name: "Aggregation Set Revert Protection", base: "aggregation set agg <agg_name> revert-protection <state>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_4" }, { name: "state", label: "State", type: "select", options: ["on", "off"] }] }
+                "aggregation_set_revert": { name: "Aggregation Set Revert Protection", base: "aggregation set agg <agg_name> revert-protection <state>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_4" }, { name: "state", label: "State", type: "select", options: ["on", "off"] }] }
             },
             "Virtual Switch & Sub-port": {
                 "vs_create": { name: "Virtual Switch Create", base: "virtual-switch create vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
@@ -123,6 +121,8 @@
                 "vs_attach_subport": { name: "VS Attach Sub-port", base: "virtual-switch interface attach sub-port <sp_name> vs <vs_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
                 "vs_detach_subport": { name: "VS Detach Sub-port", base: "virtual-switch interface detach sub-port <sp_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }] },
                 "subport_delete": { name: "Sub-port Delete", base: "sub-port delete sub-port <sp_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }] },
+                "mac_addr_show": { name: "MAC Address Show Table", base: "mac-addr show vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
+                "mac_addr_aging_set": { name: "MAC Address Aging Set", base: "mac-addr aging set timeout <seconds>", params: [{ name: "seconds", label: "Timeout (seconds)", type: "number", placeholder: "e.g., 180" }] },
             },
             "Layer 3 & IP Interfaces": {
                 "ip_interface_create": { name: "IP Interface Create", base: "interface create ip-interface <if_name> ip <ip_address>/<prefix> vs <vs_name>", params: [{ name: "if_name", label: "Interface Name", type: "text", placeholder: "e.g., ipif_30" }, { name: "ip_address", label: "IP Address", type: "text", placeholder: "e.g., 200.1.0.30" }, { name: "prefix", label: "Prefix Length", type: "number", placeholder: "e.g., 30" }, { name: "vs_name", label: "Virtual Switch", type: "text", placeholder: "e.g., vs_30" }] },
@@ -144,16 +144,19 @@
                 "mpls_l2vpn_show": { name: "MPLS L2VPN Show", base: "mpls l2-vpn show", params: [] },
                 "ldp_enable": { name: "LDP Enable", base: "ldp enable", params: [] },
                 "rsvp_te_enable": { name: "RSVP-TE Enable", base: "rsvp-te enable", params: [] },
-                "rsvp_te_enable_interface": { name: "RSVP-TE Enable on Interface", base: "rsvp-te enable ip-interface <if_name>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }] }
+                "rsvp_te_enable_interface": { name: "RSVP-TE Enable on Interface", base: "rsvp-te enable ip-interface <if_name>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }] },
+                "mpls_srlg_set": { name: "MPLS LDP Set SRLG on Interface", base: "mpls ldp interface set interface <if_name> srlg <srlg_value>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }, { name: "srlg_value", label: "SRLG Value", type: "number", placeholder: "e.g., 210" }] }
             },
-            "OAM & Diagnostics (CFM, BFD, LLDP)": {
+            "OAM & Diagnostics": {
                 "cfm_enable": { name: "CFM Enable", base: "cfm enable", params: [] },
                 "cfm_service_create": { name: "CFM Service Create", base: "cfm service create vs <vs_name> name <service_name> ccm-interval <interval>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }, { name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "interval", label: "CCM Interval", type: "select", options: ["10ms", "100ms", "1s", "10s"] }] },
                 "cfm_mep_create": { name: "CFM MEP Create", base: "cfm mep create service <service_name> sub-port <sp_name> mepid <mep_id>", params: [{ name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_LAG_1" }, { name: "mep_id", label: "MEP ID", type: "number", placeholder: "e.g., 300" }] },
                 "bfd_enable": { name: "BFD Enable", base: "bfd enable", params: [] },
                 "bfd_show": { name: "BFD Show Sessions", base: "bfd show", params: [] },
                 "lldp_enable": { name: "LLDP Enable", base: "lldp enable", params: [] },
-                "lldp_show_neighbors": { name: "LLDP Show Neighbors", base: "lldp show neighbors", params: [] }
+                "lldp_show_neighbors": { name: "LLDP Show Neighbors", base: "lldp show neighbors", params: [] },
+                "pm_create": { name: "PM Create Instance", base: "pm create <type> <name> pm-instance <pm_instance_name> profile-type <profile>", params: [{ name: "type", label: "Facility Type", type: "select", options: ["sub-port", "port-queue-group", "qos-flow"] }, { name: "name", label: "Facility Name", type: "text", placeholder: "e.g., sp_LAG_4" }, { name: "pm_instance_name", label: "PM Instance Name", type: "text", placeholder: "e.g., pm_sp_LAG_4" }, { name: "profile", label: "Profile Type", type: "select", options: ["BasicTxRx", "QueueGroup", "BasicRx"] }] },
+                "pm_show": { name: "PM Show Counts", base: "pm show facility <facility_aid>", params: [{ name: "facility_aid", label: "Facility AID", type: "text", placeholder: "e.g., ETTP-1-11-4" }] }
             },
             "Ring Protection (G.8032)": {
                 "ring_logical_create": { name: "Ring Protection Logical Ring Create", base: "ring-protection logical-ring create logical-ring-name <lr_name> ring-id <id> west-port <west_port> east-port <east_port>", params: [{ name: "lr_name", label: "Logical Ring Name", type: "text", placeholder: "e.g., lr_Lab4_1" }, { name: "id", label: "Ring ID", type: "number", placeholder: "e.g., 2" }, { name: "west_port", label: "West Port", type: "text", placeholder: "e.g., 11/1" }, { name: "east_port", label: "East Port", type: "text", placeholder: "e.g., 3/1-1" }] },
@@ -161,6 +164,19 @@
                 "ring_virtual_add_vs": { name: "Ring Protection Virtual Ring Add VS", base: "ring-protection virtual-ring add ring <vr_name> vs <vs_name>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
                 "ring_set_rpl": { name: "Ring Protection Set RPL Owner", base: "ring-protection virtual-ring set ring <vr_name> <port_side>-port-rpl owner", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "port_side", label: "Port Side", type: "select", options: ["east", "west"] }] },
                 "ring_show": { name: "Ring Protection Show Virtual Ring", base: "ring-protection virtual-ring show ring <vr_name>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }] }
+            },
+            "Quality of Service (QoS)": {
+                 "qos_meter_profile_create": { name: "QoS Metering Profile Create", base: "traffic-services metering meter-profile create profile <profile_name> cir <cir_kbps> cbs <cbs_kbytes>", params: [{ name: "profile_name", label: "Profile Name", type: "text", placeholder: "e.g., CIR5_1" }, { name: "cir_kbps", label: "CIR (kbps)", type: "number", placeholder: "e.g., 1000000" }, { name: "cbs_kbytes", label: "CBS (kBytes)", type: "number", placeholder: "e.g., 64" }] },
+                "qos_meter_profile_delete": { name: "QoS Metering Profile Delete", base: "traffic-services metering meter-profile delete profile <profile_name>", params: [{ name: "profile_name", label: "Profile Name", type: "text", placeholder: "e.g., CIR5_1" }] },
+                "subport_set_meter_profile": { name: "Sub-port Set Meter Profile", base: "sub-port set sub-port <sp_name> ingress-meter-profile <profile_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_LAG_1" }, { name: "profile_name", label: "Profile Name", type: "text", placeholder: "e.g., CIR5_1" }] },
+                "qos_flow_create": { name: "QoS Flow Create", base: "qos-flow create qos-flow-sub-port <qos_flow_name> parent-sub-port <sp_name> classifier-precedence <precedence>", params: [{ name: "qos_flow_name", label: "QoS Flow Name", type: "text", placeholder: "e.g., qosflsp_11/6" }, { name: "sp_name", label: "Parent Sub-port", type: "text", placeholder: "e.g., sp_11/6" }, { name: "precedence", label: "Precedence", type: "number", placeholder: "e.g., 110" }] }
+            },
+             "Security & Users": {
+                "user_create": { name: "User Create", base: "user create user-id <user_id> password", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., newtech" }] },
+                "user_set_privilege": { name: "User Set Privilege", base: "user set user-id <user_id> privilege <level>", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., newtech" }, { name: "level", label: "Privilege Level", type: "select", options: ["super", "admin", "limited", "diag"] }] },
+                "user_set_timeout": { name: "User Set Timeout", base: "user set user-id <user_id> automatic-timeout on timeout-interval <minutes>", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., newtech" }, { name: "minutes", label: "Timeout (minutes)", type: "number", placeholder: "e.g., 30" }] },
+                "user_show": { name: "User Show Active", base: "user show active-users", params: [] },
+                "user_delete": { name: "User Delete", base: "user delete user-id <user_id>", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., oldtech" }] }
             }
         };
 
