@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ciena SAOS CLI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .input-field {
+            @apply w-full px-3 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-200;
+        }
+        /* Explicitly style text inputs for the dark theme */
+        input[type="text"].input-field, input[type="number"].input-field {
+            background-color: #374151; /* gray-700 */
+            border-color: #4B5563;   /* gray-600 */
+            color: white;
+        }
+        /* Override for select dropdowns to a light theme to ensure option visibility */
+        select.input-field {
+            background-color: #F9FAFB; /* gray-50 */
+            border-color: #9CA3AF;   /* gray-400 */
+            color: black;
+        }
+        .label {
+            @apply block text-sm font-medium text-gray-300 mb-1;
+        }
+        .btn {
+            @apply px-4 py-2 rounded-md font-semibold text-white transition-all duration-200;
+        }
+        .btn-primary {
+            @apply bg-cyan-600 hover:bg-cyan-700;
+        }
+        .btn-secondary {
+            @apply bg-gray-600 hover:bg-gray-700;
+        }
+        .btn-copy {
+            @apply bg-teal-600 hover:bg-teal-700;
+        }
+        .copied {
+            @apply bg-green-600 hover:bg-green-700;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-cyan-400">Ciena SAOS CLI Assistant</h1>
+            <p class="text-gray-400 mt-2">Search or select a command, fill in the parameters, and generate the CLI script.</p>
+        </header>
+
+        <main class="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700">
+            <div class="mb-6">
+                <label for="search-input" class="label">Search All Commands</label>
+                <input type="text" id="search-input" class="input-field" placeholder="Type to search (e.g., 'virtual-switch', 'port', 'mpls')...">
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label for="category-select" class="label">Category</label>
+                    <select id="category-select" class="input-field">
+                        <option value="">-- Select a Category --</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="command-select" class="label">Command</label>
+                    <select id="command-select" class="input-field" disabled>
+                        <option value="">-- Select a Command --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="params-form" class="space-y-4 mb-6"></div>
+            
+            <div class="flex items-center justify-start space-x-4 mb-6">
+                <button id="generate-btn" class="btn btn-primary" disabled>Generate Command</button>
+                <button id="clear-btn" class="btn btn-secondary">Clear</button>
+            </div>
+
+            <div>
+                <label class="label">Generated Command</label>
+                <div class="bg-gray-900 p-4 rounded-md border border-gray-600 relative">
+                    <pre><code id="output-command" class="text-cyan-300 whitespace-pre-wrap break-all"></code></pre>
+                    <button id="copy-btn" class="btn btn-copy absolute top-2 right-2 text-xs py-1 px-2" style="display: none;">Copy</button>
+                </div>
+            </div>
+        </main>
+        
+        <footer class="text-center mt-8 text-gray-500 text-sm">
+            <p>Developed for easy CLI command generation. Based on SAOS documentation.</p>
+        </footer>
+    </div>
+
+    <script>
+        const commandDb = {
+            "System & Configuration": {
+                "system_set_hostname": { name: "Set Host Name", base: "system set host-name <host_name>", params: [{ name: "host_name", label: "Hostname", type: "text", placeholder: "e.g., 6500-Node-1" }] },
+                "config_save": { name: "Configuration Save", base: "configuration save", params: [] },
+                "config_show": { name: "Configuration Show", base: "configuration show", params: [] },
+                "module_create": { name: "Module Create", base: "module create slot <slot_number> model <model_name>", params: [{ name: "slot_number", label: "Slot", type: "text", placeholder: "e.g., LM3" }, { name: "model_name", label: "Model", type: "text", placeholder: "e.g., 10x10G-XFP" }] },
+            },
+            "Port & Aggregation": {
+                "port_show": { name: "Port Show", base: "port show port <port_name>", params: [{ name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 11/1" }] },
+                "port_set": { name: "Port Set Attributes", base: "port set port <port_name> <attribute> <value>", params: [{ name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1-1" }, { name: "attribute", label: "Attribute", type: "select", options: ["description", "max-frame-size", "link-flap-hold-time"] }, { name: "value", label: "Value", type: "text", placeholder: "e.g., Link to Core" }] },
+                "port_delete": { name: "Port Delete", base: "port delete port <port_name>", params: [{ name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 11/6" }] },
+                "aggregation_create": { name: "Aggregation Create", base: "aggregation create agg <agg_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }] },
+                "aggregation_add_member": { name: "Aggregation Add Member", base: "aggregation add agg <agg_name> port <port_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }, { name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1" }] },
+                "aggregation_remove_member": { name: "Aggregation Remove Member", base: "aggregation remove agg <agg_name> port <port_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }, { name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1" }] },
+                "aggregation_delete": { name: "Aggregation Delete", base: "aggregation delete agg <agg_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }] },
+                 "aggregation_set_revert": { name: "Aggregation Set Revert Protection", base: "aggregation set agg <agg_name> revert-protection <state>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_4" }, { name: "state", label: "State", type: "select", options: ["on", "off"] }] }
+            },
+            "Virtual Switch & Sub-port": {
+                "vs_create": { name: "Virtual Switch Create", base: "virtual-switch create vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
+                "vs_show": { name: "Virtual Switch Show", base: "virtual-switch show vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
+                "vs_delete": { name: "Virtual Switch Delete", base: "virtual-switch delete vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
+                "subport_create": { name: "Sub-port Create", base: "sub-port create sub-port <sp_name> parent-port <port_name> classifier-precedence <precedence>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "port_name", label: "Parent Port/LAG", type: "text", placeholder: "e.g., 11/6" }, { name: "precedence", label: "Precedence", type: "number", placeholder: "e.g., 10" }] },
+                "subport_add_vtag": { name: "Sub-port Add Vtag Stack", base: "sub-port add sub-port <sp_name> class-element <elem_id> vtag-stack <vlan_id>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "elem_id", label: "Class Element ID", type: "number", placeholder: "e.g., 1" }, { name: "vlan_id", label: "VLAN ID", type: "text", placeholder: "e.g., 200 or 1000:200" }] },
+                "subport_remove_vtag": { name: "Sub-port Remove Vtag Classifier", base: "sub-port remove sub-port <sp_name> class-element <elem_id>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "elem_id", label: "Class Element ID", type: "number", placeholder: "e.g., 1" }] },
+                "vs_attach_subport": { name: "VS Attach Sub-port", base: "virtual-switch interface attach sub-port <sp_name> vs <vs_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
+                "vs_detach_subport": { name: "VS Detach Sub-port", base: "virtual-switch interface detach sub-port <sp_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }] },
+                "subport_delete": { name: "Sub-port Delete", base: "sub-port delete sub-port <sp_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }] },
+            },
+            "Layer 3 & IP Interfaces": {
+                "ip_interface_create": { name: "IP Interface Create", base: "interface create ip-interface <if_name> ip <ip_address>/<prefix> vs <vs_name>", params: [{ name: "if_name", label: "Interface Name", type: "text", placeholder: "e.g., ipif_30" }, { name: "ip_address", label: "IP Address", type: "text", placeholder: "e.g., 200.1.0.30" }, { name: "prefix", label: "Prefix Length", type: "number", placeholder: "e.g., 30" }, { name: "vs_name", label: "Virtual Switch", type: "text", placeholder: "e.g., vs_30" }] },
+                "loopback_create": { name: "Loopback Interface Create", base: "interface create loopback <lb_name> ip <ip_address>", params: [{ name: "lb_name", label: "Loopback Name", type: "text", placeholder: "e.g., LB0" }, { name: "ip_address", label: "IP Address", type: "text", placeholder: "e.g., 10.1.1.5" }] },
+                "ip_route_add": { name: "IP Route Add", base: "ip route add destination <dest_prefix> gateway <gateway_ip>", params: [{ name: "dest_prefix", label: "Destination (x.x.x.x/y)", type: "text", placeholder: "e.g., 10.1.1.6/32" }, { name: "gateway_ip", label: "Gateway IP", type: "text", placeholder: "e.g., 200.1.0.30" }] },
+                "cpu_subinterface_create": { name: "CPU Sub-interface Create", base: "cpu-interface sub-interface create cpu-subinterface <cpu_if_name> cpu-egress-l2-transform push-8100.<vlan_id>.7", params: [{ name: "cpu_if_name", label: "CPU Interface Name", type: "text", placeholder: "e.g., cpu_sp_30" }, { name: "vlan_id", label: "Egress VLAN ID", type: "number", placeholder: "e.g., 100" }] },
+            },
+            "Routing Protocols (IS-IS, BGP)": {
+                "isis_instance_create": { name: "IS-IS Instance Create", base: "isis instance create isis-instance <instance_name> level <level> area <area_id>", params: [{ name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., ISIS1" }, { name: "level", label: "Level", type: "select", options: ["L1", "L2", "L1-L2"] }, { name: "area_id", label: "Area ID", type: "text", placeholder: "e.g., 49.0001" }] },
+                "isis_interface_attach": { name: "IS-IS Interface Attach", base: "isis interface attach ip-interface <if_name> isis-instance <instance_name> level <level>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }, { name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., ISIS1" }, { name: "level", label: "Level", type: "select", options: ["L1", "L2", "L1-L2"] }] },
+                 "bgp_instance_create": { name: "BGP Instance Create", base: "bgp instance create instance <instance_name> as <as_number>", params: [{ name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., myBGP" }, { name: "as_number", label: "AS Number", type: "number", placeholder: "e.g., 65001" }] },
+                "bgp_neighbor_create": { name: "BGP Neighbor Create", base: "bgp neighbor create <neighbor_ip> instance <instance_name> remote-as <remote_as>", params: [{ name: "neighbor_ip", label: "Neighbor IP", type: "text", placeholder: "e.g., 10.1.1.6" }, { name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., myBGP" }, { name: "remote_as", label: "Remote AS", type: "number", placeholder: "e.g., 65002" }] }
+            },
+            "MPLS (LDP, RSVP-TE, VCs)": {
+                "mpls_tunnel_create_rsvp": { name: "MPLS Tunnel Create RSVP", base: "mpls tunnel create rsvp-ingress <tunnel_name> dest-ip <dest_ip>", params: [{ name: "tunnel_name", label: "Tunnel Name", type: "text", placeholder: "e.g., PTS5-to-PTS6" }, { name: "dest_ip", label: "Destination IP", type: "text", placeholder: "e.g., 10.1.1.6" }] },
+                "mpls_l2vpn_create_vc": { name: "MPLS L2VPN Create Dynamic VC", base: "mpls l2-vpn create dynamic-vc <vc_name> pw-id <pw_id> peer <peer_ip> te-tunnel <tunnel_name>", params: [{ name: "vc_name", label: "VC Name", type: "text", placeholder: "e.g., dvc_PTS5-PTS6" }, { name: "pw_id", label: "PW ID", type: "number", placeholder: "e.g., 10" }, { name: "peer_ip", label: "Peer IP", type: "text", placeholder: "e.g., 10.1.1.6" }, { name: "tunnel_name", label: "TE Tunnel Name", type: "text", placeholder: "e.g., PTS5-to-PTS6" }] },
+                "mpls_ping_vc": { name: "MPLS Ping VC", base: "mpls ping vc <vc_name>", params: [{ name: "vc_name", label: "VC Name", type: "text", placeholder: "e.g., vc_Lab5_65" }] },
+                "mpls_ping_tunnel": { name: "MPLS Ping RSVP Tunnel", base: "mpls ping rsvp-ingress <tunnel_name>", params: [{ name: "tunnel_name", label: "Tunnel Name", type: "text", placeholder: "e.g., PTS5-to-PTS6" }] },
+                "mpls_l2vpn_show": { name: "MPLS L2VPN Show", base: "mpls l2-vpn show", params: [] },
+                "ldp_enable": { name: "LDP Enable", base: "ldp enable", params: [] },
+                "rsvp_te_enable": { name: "RSVP-TE Enable", base: "rsvp-te enable", params: [] },
+                "rsvp_te_enable_interface": { name: "RSVP-TE Enable on Interface", base: "rsvp-te enable ip-interface <if_name>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }] }
+            },
+            "OAM & Diagnostics (CFM, BFD, LLDP)": {
+                "cfm_enable": { name: "CFM Enable", base: "cfm enable", params: [] },
+                "cfm_service_create": { name: "CFM Service Create", base: "cfm service create vs <vs_name> name <service_name> ccm-interval <interval>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }, { name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "interval", label: "CCM Interval", type: "select", options: ["10ms", "100ms", "1s", "10s"] }] },
+                "cfm_mep_create": { name: "CFM MEP Create", base: "cfm mep create service <service_name> sub-port <sp_name> mepid <mep_id>", params: [{ name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_LAG_1" }, { name: "mep_id", label: "MEP ID", type: "number", placeholder: "e.g., 300" }] },
+                "bfd_enable": { name: "BFD Enable", base: "bfd enable", params: [] },
+                "bfd_show": { name: "BFD Show Sessions", base: "bfd show", params: [] },
+                "lldp_enable": { name: "LLDP Enable", base: "lldp enable", params: [] },
+                "lldp_show_neighbors": { name: "LLDP Show Neighbors", base: "lldp show neighbors", params: [] }
+            },
+            "Ring Protection (G.8032)": {
+                "ring_logical_create": { name: "Ring Protection Logical Ring Create", base: "ring-protection logical-ring create logical-ring-name <lr_name> ring-id <id> west-port <west_port> east-port <east_port>", params: [{ name: "lr_name", label: "Logical Ring Name", type: "text", placeholder: "e.g., lr_Lab4_1" }, { name: "id", label: "Ring ID", type: "number", placeholder: "e.g., 2" }, { name: "west_port", label: "West Port", type: "text", placeholder: "e.g., 11/1" }, { name: "east_port", label: "East Port", type: "text", placeholder: "e.g., 3/1-1" }] },
+                "ring_virtual_create": { name: "Ring Protection Virtual Ring Create", base: "ring-protection virtual-ring create virtual-ring-name <vr_name> logical-ring <lr_name> raps-vid <vlan_id>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "lr_name", label: "Logical Ring Name", type: "text", placeholder: "e.g., lr_Lab4_1" }, { name: "vlan_id", label: "RAPS VID", type: "number", placeholder: "e.g., 1" }] },
+                "ring_virtual_add_vs": { name: "Ring Protection Virtual Ring Add VS", base: "ring-protection virtual-ring add ring <vr_name> vs <vs_name>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
+                "ring_set_rpl": { name: "Ring Protection Set RPL Owner", base: "ring-protection virtual-ring set ring <vr_name> <port_side>-port-rpl owner", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "port_side", label: "Port Side", type: "select", options: ["east", "west"] }] },
+                "ring_show": { name: "Ring Protection Show Virtual Ring", base: "ring-protection virtual-ring show ring <vr_name>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }] }
+            }
+        };
+
+        const searchInput = document.getElementById('search-input');
+        const categorySelect = document.getElementById('category-select');
+        const commandSelect = document.getElementById('command-select');
+        const paramsForm = document.getElementById('params-form');
+        const generateBtn = document.getElementById('generate-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const outputCommand = document.getElementById('output-command');
+        const copyBtn = document.getElementById('copy-btn');
+        
+        function populateCategories(filter = '') {
+            const currentCategory = categorySelect.value;
+            categorySelect.innerHTML = '<option value="">-- All Categories --</option>';
+            const filteredCategories = new Set();
+
+            if (filter) {
+                Object.entries(commandDb).forEach(([category, commands]) => {
+                    Object.values(commands).forEach(command => {
+                        if (command.name.toLowerCase().includes(filter) || command.base.toLowerCase().includes(filter)) {
+                            filteredCategories.add(category);
+                        }
+                    });
+                });
+            }
+
+            const source = filter ? Array.from(filteredCategories).sort() : Object.keys(commandDb).sort();
+            
+            source.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categorySelect.appendChild(option);
+            });
+            
+            if (filter) {
+                 categorySelect.value = ""; // Default to all categories when searching
+            } else if (Array.from(categorySelect.options).some(opt => opt.value === currentCategory)) {
+                 categorySelect.value = currentCategory;
+            }
+            populateCommands(filter);
+        }
+        
+        function populateCommands(filter = '') {
+            const selectedCategory = categorySelect.value;
+            commandSelect.innerHTML = '<option value="">-- Select a Command --</option>';
+            commandSelect.disabled = true;
+
+            const commandSource = selectedCategory ? { [selectedCategory]: commandDb[selectedCategory] } : commandDb;
+            
+            let commandList = [];
+            Object.keys(commandSource).forEach(category => {
+                const commands = commandSource[category];
+                Object.keys(commands).forEach(commandKey => {
+                    const command = commands[commandKey];
+                    if(filter === '' || command.name.toLowerCase().includes(filter) || command.base.toLowerCase().includes(filter)) {
+                        commandList.push({ key: commandKey, category: category, name: command.name });
+                    }
+                });
+            });
+
+            commandList.sort((a,b) => a.name.localeCompare(b.name));
+
+            commandList.forEach(cmd => {
+                const option = document.createElement('option');
+                option.value = cmd.key;
+                option.dataset.category = cmd.category;
+                option.textContent = `${cmd.name} (${cmd.category})`;
+                commandSelect.appendChild(option);
+            });
+            
+             if(commandSelect.options.length > 1) {
+                 commandSelect.disabled = false;
+             }
+        }
+        
+        // Initial Population
+        populateCategories();
+
+        // Event Listeners
+         searchInput.addEventListener('input', () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            populateCategories(searchTerm);
+        });
+
+        categorySelect.addEventListener('change', () => {
+            populateCommands(searchInput.value.toLowerCase());
+            paramsForm.innerHTML = '';
+            outputCommand.textContent = '';
+            copyBtn.style.display = 'none';
+            generateBtn.disabled = true;
+        });
+
+        commandSelect.addEventListener('change', () => {
+            const selectedCommandKey = commandSelect.value;
+            if (!selectedCommandKey) {
+                paramsForm.innerHTML = '';
+                outputCommand.textContent = '';
+                copyBtn.style.display = 'none';
+                generateBtn.disabled = true;
+                return;
+            };
+
+            const selectedOption = commandSelect.options[commandSelect.selectedIndex];
+            const selectedCategory = selectedOption.dataset.category;
+            paramsForm.innerHTML = '';
+            outputCommand.textContent = '';
+            copyBtn.style.display = 'none';
+
+            if (selectedCommandKey && selectedCategory) {
+                if (categorySelect.value !== selectedCategory) {
+                    categorySelect.value = selectedCategory;
+                }
+                
+                generateBtn.disabled = false;
+                const command = commandDb[selectedCategory][selectedCommandKey];
+                
+                if (command.params.length === 0) {
+                     generateBtn.click(); // Auto-generate if no params
+                } else {
+                    command.params.forEach(param => {
+                        let inputHtml = '';
+                        if (param.type === 'select') {
+                            const optionsHtml = param.options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                            inputHtml = `<select id="param-${param.name}" class="input-field">${optionsHtml}</select>`;
+                        } else {
+                            inputHtml = `<input type="${param.type}" id="param-${param.name}" class="input-field" placeholder="${param.placeholder || ''}">`;
+                        }
+                        
+                        const paramDiv = document.createElement('div');
+                        paramDiv.innerHTML = `<label for="param-${param.name}" class="label">${param.label}</label>${inputHtml}`;
+                        paramsForm.appendChild(paramDiv);
+                    });
+                }
+            } else {
+                generateBtn.disabled = true;
+            }
+        });
+
+        generateBtn.addEventListener('click', () => {
+            const selectedOption = commandSelect.options[commandSelect.selectedIndex];
+            if (!selectedOption || !selectedOption.value) return;
+
+            const selectedCategory = selectedOption.dataset.category;
+            const selectedCommandKey = selectedOption.value;
+
+            if (!selectedCategory || !selectedCommandKey) return;
+
+            const command = commandDb[selectedCategory][selectedCommandKey];
+            let finalCommand = command.base;
+
+            command.params.forEach(param => {
+                const inputElement = document.getElementById(`param-${param.name}`);
+                if (inputElement) {
+                    const value = inputElement.value;
+                    const placeholder = `<${param.name}>`;
+                    finalCommand = finalCommand.replace(placeholder, value || param.placeholder || "");
+                }
+            });
+
+            outputCommand.textContent = finalCommand;
+            copyBtn.style.display = 'block';
+            copyBtn.textContent = 'Copy';
+            copyBtn.classList.remove('copied');
+        });
+        
+        copyBtn.addEventListener('click', () => {
+            const textToCopy = outputCommand.textContent;
+            const textArea = document.createElement('textarea');
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                copyBtn.textContent = 'Copied!';
+                copyBtn.classList.add('copied');
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+            document.body.removeChild(textArea);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            populateCategories(); 
+            commandSelect.innerHTML = '<option value="">-- Select a Command --</option>';
+            commandSelect.disabled = true;
+            paramsForm.innerHTML = '';
+            outputCommand.textContent = '';
+            generateBtn.disabled = true;
+            copyBtn.style.display = 'none';
+        });
+
+    </script>
+</body>
+</html>
