@@ -39,16 +39,13 @@
         </header>
 
         <main class="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700">
-            <div class="flex justify-center mb-6 border-b border-gray-700 pb-4">
-                <div class="inline-flex rounded-md shadow-sm" role="group">
-                    <button type="button" id="workflow-mode-btn" class="toggle-btn rounded-l-lg active">
-                        Provisioning Workflows
-                    </button>
-                    
-                    <button type="button" id="command-mode-btn" class="toggle-btn rounded-r-lg">
-                        Individual Command Reference
-                    </button>
-                </div>
+            <div class="flex justify-center mb-6 border-b border-gray-700 pb-4 space-x-2">
+                <button type="button" id="workflow-mode-btn" class="toggle-btn active">
+                    Provisioning Workflows
+                </button>
+                <button type="button" id="command-mode-btn" class="toggle-btn">
+                    Individual Command Reference
+                </button>
             </div>
 
             <div id="workflow-mode-content">
@@ -688,4 +685,3 @@ virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
     </script>
 </body>
 </html>
-
