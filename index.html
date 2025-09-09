@@ -26,8 +26,6 @@
         .warning-box { @apply bg-yellow-900 border-l-4 border-yellow-500 text-yellow-200 p-4 rounded-r-lg mt-4; }
         .checkbox-label { @apply flex items-center space-x-2 text-gray-300; }
         .checkbox-label input { @apply w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500; }
-        .toggle-btn { @apply px-5 py-2 text-sm font-medium text-gray-300 border-2 border-gray-600 rounded-lg; }
-        .toggle-btn.active { @apply bg-cyan-600 text-white border-cyan-500; }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -39,13 +37,12 @@
         </header>
 
         <main class="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700">
-            <div class="flex justify-center mb-6 border-b border-gray-700 pb-6 space-x-4">
-                <button type="button" id="workflow-mode-btn" class="toggle-btn active">
-                    Provisioning Workflows
-                </button>
-                <button type="button" id="command-mode-btn" class="toggle-btn">
-                    Individual Command Reference
-                </button>
+            <div class="mb-6 border-b border-gray-700 pb-6">
+                <label for="tool-select" class="label">Select Tool</label>
+                <select id="tool-select" class="input-field">
+                    <option value="workflow" selected>Provisioning Workflows</option>
+                    <option value="command">Individual Command Reference</option>
+                </select>
             </div>
 
             <div id="workflow-mode-content">
@@ -388,8 +385,7 @@ virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
         };
 
         // --- UI ELEMENT REFERENCES ---
-        const workflowModeBtn = document.getElementById('workflow-mode-btn');
-        const commandModeBtn = document.getElementById('command-mode-btn');
+        const toolSelect = document.getElementById('tool-select');
         const workflowModeContent = document.getElementById('workflow-mode-content');
         const commandModeContent = document.getElementById('command-mode-content');
         const workflowSelect = document.getElementById('workflow-select');
@@ -410,15 +406,11 @@ virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
         function switchMode(mode) {
             currentMode = mode;
             if (mode === 'workflow') {
-                workflowModeBtn.classList.add('active');
-                commandModeBtn.classList.remove('active');
                 workflowModeContent.classList.remove('hidden');
                 commandModeContent.classList.add('hidden');
                 outputLabel.textContent = 'Generated Provisioning Script';
                 generateBtn.textContent = 'Generate Script';
             } else {
-                commandModeBtn.classList.add('active');
-                workflowModeBtn.classList.remove('active');
                 commandModeContent.classList.remove('hidden');
                 workflowModeContent.classList.add('hidden');
                 outputLabel.textContent = 'Generated Command';
@@ -571,8 +563,7 @@ virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
         }
 
         // --- EVENT LISTENERS ---
-        workflowModeBtn.addEventListener('click', () => switchMode('workflow'));
-        commandModeBtn.addEventListener('click', () => switchMode('command'));
+        toolSelect.addEventListener('change', (e) => switchMode(e.target.value));
 
         workflowSelect.addEventListener('change', () => {
             const key = workflowSelect.value;
