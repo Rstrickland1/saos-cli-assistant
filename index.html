@@ -26,6 +26,8 @@
         .warning-box { @apply bg-yellow-900 border-l-4 border-yellow-500 text-yellow-200 p-4 rounded-r-lg mt-4; }
         .checkbox-label { @apply flex items-center space-x-2 text-gray-300; }
         .checkbox-label input { @apply w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500; }
+        .toggle-btn { @apply px-5 py-2 text-sm font-medium text-gray-300 border-2 border-gray-600 rounded-lg; }
+        .toggle-btn.active { @apply bg-cyan-600 text-white border-cyan-500; }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -143,50 +145,58 @@ virtual-switch interface attach sub-port ${sp_b_name} vs ${vs_name}
 ! ### End of Workflow ###`;
                 }
             },
-            "l2_p2p_eline": {
-                name: "L2 Point-to-Point Service (E-Line)",
+            "l2_p2p_eline_transform": {
+                name: "L2 P2P Service (E-Line) with L2 Transform",
                 params: [
-                    { name: "service_name", label: "Service Name", type: "text", placeholder: "e.g., CustomerA_X-Connect" },
+                    { name: "service_name", label: "Service Name", type: "text", placeholder: "e.g., CustA_VLAN_Swap" },
                     { name: "port_a", label: "Port A", type: "text", placeholder: "e.g., 1/1" },
                     { name: "port_b", label: "Port B", type: "text", placeholder: "e.g., 1/2" },
-                    { name: "vlan_id", label: "VLAN ID", type: "number", placeholder: "e.g., 100" },
-                    { name: "add_l2_transform", label: "Add L2 Transform (VLAN Swap)", type: "checkbox" },
-                    { name: "vlan_b", label: "VLAN ID for Port B (if transform)", type: "number", placeholder: "e.g., 200", condition: "add_l2_transform" }
+                    { name: "vlan_a", label: "Ingress VLAN on Port A", type: "number", placeholder: "e.g., 100" },
+                    { name: "transform_a_action", label: "Egress Transform Action on Port A", type: "select", options: ["none", "pop", "push", "swap"] },
+                    { name: "transform_a_vlan", label: "Egress VLAN for Port A (if push/swap)", type: "number", placeholder: "e.g., 200", condition: "transform_a_action" },
+                    { name: "vlan_b", label: "Ingress VLAN on Port B", type: "number", placeholder: "e.g., 200" },
+                    { name: "transform_b_action", label: "Egress Transform Action on Port B", type: "select", options: ["none", "pop", "push", "swap"] },
+                    { name: "transform_b_vlan", label: "Egress VLAN for Port B (if push/swap)", type: "number", placeholder: "e.g., 100", condition: "transform_b_action" }
                 ],
-                notes: ["This workflow creates a basic VLAN-based point-to-point cross-connect (E-Line) between two ports."],
+                notes: ["This workflow creates a point-to-point cross-connect with options for complex VLAN transformations (pop, push, swap) at each end.", "Ensure your transform logic is correct (e.g., a 'pop' on one side should correspond to a 'push' on the other)."],
                 generate: (p) => {
                     const vs_name = `vs_${p.service_name}`;
-                    const sp_a_name = `sp_${p.port_a.replace('/', '_')}_${p.vlan_id}`;
-                    const sp_b_name = `sp_${p.port_b.replace('/', '_')}_${p.add_l2_transform ? p.vlan_b : p.vlan_id}`;
-                    const vlan_b = p.add_l2_transform ? p.vlan_b : p.vlan_id;
+                    const sp_a_name = `sp_${p.port_a.replace('/', '_')}_${p.vlan_a}`;
+                    const sp_b_name = `sp_${p.port_b.replace('/', '_')}_${p.vlan_b}`;
 
                     let script = `!
-! ### Workflow: L2 Point-to-Point Service (E-Line) ###
+! ### Workflow: L2 Point-to-Point Service with L2 Transform ###
 ! Service: ${p.service_name}
-! Port A: ${p.port_a} (VLAN ${p.vlan_id}) <--> Port B: ${p.port_b} (VLAN ${vlan_b})
 !
 
 # Step 1: Create a dedicated virtual switch for the service.
 virtual-switch create vs ${vs_name}
 
-`;
-
-                    script += `# Step 2: Create and configure the sub-port for Port A.
+# Step 2: Create and configure sub-port A (Port: ${p.port_a}, Ingress VLAN: ${p.vlan_a})
 sub-port create sub-port ${sp_a_name} parent-port ${p.port_a} classifier-precedence 10
-sub-port add sub-port ${sp_a_name} class-element 1 vtag-stack ${p.vlan_id}
+sub-port add sub-port ${sp_a_name} class-element 1 vtag-stack ${p.vlan_a}
 `;
-
-                    if (p.add_l2_transform) {
-                        script += `sub-port set sub-port ${sp_a_name} egress-l2-transform pop-1;stamp-8100.${vlan_b}.map\n`;
+                    // Port A transform logic
+                    if (p.transform_a_action !== 'none') {
+                        let transform_cmd = `sub-port set sub-port ${sp_a_name} egress-l2-transform `;
+                        if (p.transform_a_action === 'pop') transform_cmd += `pop`;
+                        if (p.transform_a_action === 'push') transform_cmd += `push-8100.${p.transform_a_vlan}.map`;
+                        if (p.transform_a_action === 'swap') transform_cmd += `pop;stamp-8100.${p.transform_a_vlan}.map`;
+                        script += transform_cmd + `\n`;
                     }
 
                     script += `
-# Step 3: Create and configure the sub-port for Port B.
+# Step 3: Create and configure sub-port B (Port: ${p.port_b}, Ingress VLAN: ${p.vlan_b})
 sub-port create sub-port ${sp_b_name} parent-port ${p.port_b} classifier-precedence 10
-sub-port add sub-port ${sp_b_name} class-element 1 vtag-stack ${vlan_b}
+sub-port add sub-port ${sp_b_name} class-element 1 vtag-stack ${p.vlan_b}
 `;
-                    if (p.add_l2_transform) {
-                        script += `sub-port set sub-port ${sp_b_name} egress-l2-transform pop-1;stamp-8100.${p.vlan_id}.map\n`;
+                    // Port B transform logic
+                    if (p.transform_b_action !== 'none') {
+                        let transform_cmd = `sub-port set sub-port ${sp_b_name} egress-l2-transform `;
+                        if (p.transform_b_action === 'pop') transform_cmd += `pop`;
+                        if (p.transform_b_action === 'push') transform_cmd += `push-8100.${p.transform_b_vlan}.map`;
+                        if (p.transform_b_action === 'swap') transform_cmd += `pop;stamp-8100.${p.transform_b_vlan}.map`;
+                        script += transform_cmd + `\n`;
                     }
                     
                     script += `
@@ -229,7 +239,7 @@ sub-port create sub-port ${sp_name} parent-port ${p.port} classifier-precedence 
 sub-port add sub-port ${sp_name} class-element 1 vtag-stack ${p.vlan_id}
 
 # Step 3: Create the CPU sub-interface for packet processing.
-cpu-interface sub-interface create cpu-subinterface ${cpu_if_name} cpu-egress-l2-transform pop-1;stamp-8100.${p.vlan_id}.map
+cpu-interface sub-interface create cpu-subinterface ${cpu_if_name} cpu-egress-l2-transform pop;stamp-8100.${p.vlan_id}.map
 
 # Step 4: Attach the physical and CPU interfaces to the virtual switch.
 virtual-switch interface attach sub-port ${sp_name} vs ${vs_name}
@@ -540,10 +550,16 @@ virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
 
             item.params.forEach(param => {
                 if (param.condition) {
-                    const conditionCheckbox = document.getElementById(`param-${param.condition}`);
+                    const conditionEl = document.getElementById(`param-${param.condition}`);
                     const targetField = document.getElementById(`param-${param.name}`)?.parentElement;
-                    if (conditionCheckbox && targetField) {
-                        targetField.style.display = conditionCheckbox.checked ? 'block' : 'none';
+                    if(targetField) {
+                       let isVisible = false;
+                       if (conditionEl.type === 'checkbox') {
+                           isVisible = conditionEl.checked;
+                       } else {
+                           isVisible = conditionEl.value === 'push' || conditionEl.value === 'swap';
+                       }
+                       targetField.style.display = isVisible ? 'block' : 'none';
                     }
                 }
             });
@@ -607,7 +623,9 @@ virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
         });
 
         paramsForm.addEventListener('change', (e) => {
-            if (e.target.type === 'checkbox') toggleConditionalFields();
+            if (e.target.type === 'checkbox' || e.target.tagName === 'SELECT') {
+                toggleConditionalFields();
+            }
         });
 
         generateBtn.addEventListener('click', () => {
