@@ -26,8 +26,8 @@
         .warning-box { @apply bg-yellow-900 border-l-4 border-yellow-500 text-yellow-200 p-4 rounded-r-lg mt-4; }
         .checkbox-label { @apply flex items-center space-x-2 text-gray-300; }
         .checkbox-label input { @apply w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500; }
-        .toggle-btn { @apply px-4 py-2 text-sm font-medium text-gray-300 border border-gray-600 rounded-md; }
-        .toggle-btn.active { @apply bg-cyan-600 text-white border-cyan-600; }
+        .toggle-btn { @apply px-5 py-2 text-sm font-medium text-gray-300 border-2 border-gray-600 rounded-lg; }
+        .toggle-btn.active { @apply bg-cyan-600 text-white border-cyan-500; }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -39,7 +39,7 @@
         </header>
 
         <main class="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700">
-            <div class="flex justify-center mb-6 border-b border-gray-700 pb-4 space-x-2">
+            <div class="flex justify-center mb-6 border-b border-gray-700 pb-6 space-x-4">
                 <button type="button" id="workflow-mode-btn" class="toggle-btn active">
                     Provisioning Workflows
                 </button>
@@ -351,6 +351,8 @@ virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
                 "cfm_enable": { name: "CFM Enable", base: "cfm enable", params: [] },
                 "cfm_service_create": { name: "CFM Service Create", base: "cfm service create vs <vs_name> name <service_name> ccm-interval <interval>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Service1" }, { name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "interval", label: "CCM Interval", type: "select", options: ["10ms", "100ms", "1s", "10s"] }] },
                 "cfm_mep_create": { name: "CFM MEP Create", base: "cfm mep create service <service_name> sub-port <sp_name> mepid <mep_id>", params: [{ name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_LAG_1" }, { name: "mep_id", label: "MEP ID", type: "number", placeholder: "e.g., 300 (unique)" }], notes: ["The MEP ID must be unique within the CFM service domain."] },
+                "cfm_service_show": { name: "CFM Service Show", base: "cfm service show", params: [] },
+                "cfm_mep_show": { name: "CFM MEP Show Status", base: "cfm mep show service <service_name> mepid <mep_id>", params: [{ name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "mep_id", label: "MEP ID", type: "number", placeholder: "e.g., 300" }] },
                 "bfd_enable": { name: "BFD Enable", base: "bfd enable", params: [] },
                 "bfd_show": { name: "BFD Show Sessions", base: "bfd show", params: [] },
                 "lldp_enable": { name: "LLDP Enable", base: "lldp enable", params: [] },
