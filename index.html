@@ -3,84 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ciena SAOS CLI Assistant</title>
+    <title>Ciena SAOS Provisioning Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .input-field {
+        body { font-family: 'Inter', sans-serif; }
+        .input-field, .checkbox-label input {
             @apply w-full px-3 py-2 border rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-200;
         }
         input[type="text"].input-field, input[type="number"].input-field {
-            background-color: #374151; /* gray-700 */
-            border-color: #4B5563;   /* gray-600 */
-            color: white;
+            background-color: #374151; border-color: #4B5563; color: white;
         }
         select.input-field {
-            background-color: #F9FAFB; /* gray-50 */
-            border-color: #9CA3AF;   /* gray-400 */
-            color: black;
+            background-color: #F9FAFB; border-color: #9CA3AF; color: black;
         }
-        .label {
-            @apply block text-sm font-medium text-gray-300 mb-1;
-        }
-        .btn {
-            @apply px-4 py-2 rounded-md font-semibold text-white transition-all duration-200;
-        }
-        .btn-primary {
-            @apply bg-cyan-600 hover:bg-cyan-700;
-        }
-        .btn-secondary {
-            @apply bg-gray-600 hover:bg-gray-700;
-        }
-        .btn-copy {
-            @apply bg-teal-600 hover:bg-teal-700;
-        }
-        .copied {
-            @apply bg-green-600 hover:bg-green-700;
-        }
+        .label { @apply block text-sm font-medium text-gray-300 mb-1; }
+        .btn { @apply px-4 py-2 rounded-md font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed; }
+        .btn-primary { @apply bg-cyan-600 hover:bg-cyan-700; }
+        .btn-secondary { @apply bg-gray-600 hover:bg-gray-700; }
+        .btn-copy { @apply bg-teal-600 hover:bg-teal-700; }
+        .copied { @apply bg-green-600 hover:bg-green-700; }
+        .warning-box { @apply bg-yellow-900 border-l-4 border-yellow-500 text-yellow-200 p-4 rounded-r-lg mt-4; }
+        .checkbox-label { @apply flex items-center space-x-2 text-gray-300; }
+        .checkbox-label input { @apply w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500; }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
 
     <div class="container mx-auto p-4 md:p-8 max-w-4xl">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-cyan-400">Ciena SAOS CLI Assistant</h1>
-            <p class="text-gray-400 mt-2">Search or select a command, fill in the parameters, and generate the CLI script.</p>
+            <h1 class="text-4xl font-bold text-cyan-400">Ciena SAOS Provisioning Assistant</h1>
+            <p class="text-gray-400 mt-2">Select a provisioning workflow, fill in the parameters, and generate a complete CLI script.</p>
         </header>
 
         <main class="bg-gray-800 p-6 rounded-lg shadow-2xl border border-gray-700">
             <div class="mb-6">
-                <label for="search-input" class="label">Search All Commands</label>
-                <input type="text" id="search-input" class="input-field" placeholder="Type to search (e.g., 'virtual-switch', 'port', 'mpls')...">
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label for="category-select" class="label">Category</label>
-                    <select id="category-select" class="input-field">
-                        <option value="">-- Select a Category --</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="command-select" class="label">Command</label>
-                    <select id="command-select" class="input-field" disabled>
-                        <option value="">-- Select a Command --</option>
-                    </select>
-                </div>
+                <label for="workflow-select" class="label">Provisioning Workflow</label>
+                <select id="workflow-select" class="input-field">
+                    <option value="">-- Select a Workflow --</option>
+                </select>
             </div>
 
             <div id="params-form" class="space-y-4 mb-6"></div>
             
+            <div id="warnings-container" class="space-y-2 mb-6"></div>
+
             <div class="flex items-center justify-start space-x-4 mb-6">
-                <button id="generate-btn" class="btn btn-primary" disabled>Generate Command</button>
+                <button id="generate-btn" class="btn btn-primary" disabled>Generate Script</button>
                 <button id="clear-btn" class="btn btn-secondary">Clear</button>
             </div>
 
             <div>
-                <label class="label">Generated Command</label>
+                <label class="label">Generated Provisioning Script</label>
                 <div class="bg-gray-900 p-4 rounded-md border border-gray-600 relative">
                     <pre><code id="output-command" class="text-cyan-300 whitespace-pre-wrap break-all"></code></pre>
                     <button id="copy-btn" class="btn btn-copy absolute top-2 right-2 text-xs py-1 px-2" style="display: none;">Copy</button>
@@ -89,256 +63,274 @@
         </main>
         
         <footer class="text-center mt-8 text-gray-500 text-sm">
-            <p>Developed for easy CLI command generation. Based on SAOS documentation.</p>
+            <p>Developed to simplify SAOS service provisioning.</p>
         </footer>
     </div>
 
     <script>
-        const commandDb = {
-            "System & Configuration": {
-                "system_set_hostname": { name: "Set Host Name", base: "system set host-name <host_name>", params: [{ name: "host_name", label: "Hostname", type: "text", placeholder: "e.g., 6500-Node-1" }] },
-                "config_save": { name: "Configuration Save", base: "configuration save", params: [] },
-                "config_show": { name: "Configuration Show", base: "configuration show", params: [] },
-                "module_create": { name: "Module Create", base: "module create slot <slot_number> model <model_name>", params: [{ name: "slot_number", label: "Slot", type: "text", placeholder: "e.g., LM3" }, { name: "model_name", label: "Model", type: "text", placeholder: "e.g., 10x10G-XFP" }] },
+        const workflowDb = {
+            "l2_p2p_eline": {
+                name: "L2 Point-to-Point Service (E-Line)",
+                params: [
+                    { name: "service_name", label: "Service Name", type: "text", placeholder: "e.g., CustomerA_X-Connect" },
+                    { name: "port_a", label: "Port A", type: "text", placeholder: "e.g., 1/1" },
+                    { name: "port_b", label: "Port B", type: "text", placeholder: "e.g., 1/2" },
+                    { name: "vlan_id", label: "VLAN ID", type: "number", placeholder: "e.g., 100" },
+                    { name: "add_l2_transform", label: "Add L2 Transform (VLAN Swap)", type: "checkbox" },
+                    { name: "vlan_b", label: "VLAN ID for Port B (if transform)", type: "number", placeholder: "e.g., 200", condition: "add_l2_transform" }
+                ],
+                notes: ["This workflow creates a basic VLAN-based point-to-point cross-connect (E-Line) between two ports."],
+                generate: (p) => {
+                    const vs_name = `vs_${p.service_name}`;
+                    const sp_a_name = `sp_${p.port_a.replace('/', '_')}_${p.vlan_id}`;
+                    const sp_b_name = `sp_${p.port_b.replace('/', '_')}_${p.add_l2_transform ? p.vlan_b : p.vlan_id}`;
+                    const vlan_b = p.add_l2_transform ? p.vlan_b : p.vlan_id;
+
+                    let script = `!
+! ### Workflow: L2 Point-to-Point Service (E-Line) ###
+! Service: ${p.service_name}
+! Port A: ${p.port_a} (VLAN ${p.vlan_id}) <--> Port B: ${p.port_b} (VLAN ${vlan_b})
+!
+
+# Step 1: Create a dedicated virtual switch for the service.
+virtual-switch create vs ${vs_name}
+
+`;
+
+                    script += `# Step 2: Create and configure the sub-port for Port A.
+sub-port create sub-port ${sp_a_name} parent-port ${p.port_a} classifier-precedence 10
+sub-port add sub-port ${sp_a_name} class-element 1 vtag-stack ${p.vlan_id}
+`;
+
+                    if (p.add_l2_transform) {
+                        script += `sub-port set sub-port ${sp_a_name} egress-l2-transform pop-1;stamp-8100.${vlan_b}.map\n`;
+                    }
+
+                    script += `
+# Step 3: Create and configure the sub-port for Port B.
+sub-port create sub-port ${sp_b_name} parent-port ${p.port_b} classifier-precedence 10
+sub-port add sub-port ${sp_b_name} class-element 1 vtag-stack ${vlan_b}
+`;
+                    if (p.add_l2_transform) {
+                        script += `sub-port set sub-port ${sp_b_name} egress-l2-transform pop-1;stamp-8100.${p.vlan_id}.map\n`;
+                    }
+                    
+                    script += `
+# Step 4: Attach both sub-ports to the virtual switch to complete the cross-connect.
+virtual-switch interface attach sub-port ${sp_a_name} vs ${vs_name}
+virtual-switch interface attach sub-port ${sp_b_name} vs ${vs_name}
+
+! ### End of Workflow ###`;
+                    
+                    return script;
+                }
             },
-            "Port & Aggregation": {
-                "port_show": { name: "Port Show", base: "port show port <port_name>", params: [{ name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 11/1" }] },
-                "port_set": { name: "Port Set Attributes", base: "port set port <port_name> <attribute> <value>", params: [{ name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1-1" }, { name: "attribute", label: "Attribute", type: "select", options: ["description", "max-frame-size", "link-flap-hold-time"] }, { name: "value", label: "Value", type: "text", placeholder: "e.g., Link to Core" }] },
-                "port_delete": { name: "Port Delete", base: "port delete port <port_name>", params: [{ name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 11/6" }] },
-                "aggregation_create": { name: "Aggregation Create", base: "aggregation create agg <agg_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }] },
-                "aggregation_add_member": { name: "Aggregation Add Member", base: "aggregation add agg <agg_name> port <port_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }, { name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1" }] },
-                "aggregation_remove_member": { name: "Aggregation Remove Member", base: "aggregation remove agg <agg_name> port <port_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }, { name: "port_name", label: "Port Name", type: "text", placeholder: "e.g., 3/1" }] },
-                "aggregation_delete": { name: "Aggregation Delete", base: "aggregation delete agg <agg_name>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_1" }] },
-                "aggregation_set_revert": { name: "Aggregation Set Revert Protection", base: "aggregation set agg <agg_name> revert-protection <state>", params: [{ name: "agg_name", label: "LAG Name", type: "text", placeholder: "e.g., LAG_4" }, { name: "state", label: "State", type: "select", options: ["on", "off"] }] }
+            "l3_interface_setup": {
+                name: "L3 Routed Interface Setup",
+                params: [
+                    { name: "port", label: "Physical Port", type: "text", placeholder: "e.g., 3/1" },
+                    { name: "vlan_id", label: "Interface VLAN ID", type: "number", placeholder: "e.g., 200" },
+                    { name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_to_core" },
+                    { name: "ip_address", label: "IP Address", type: "text", placeholder: "e.g., 10.10.20.1" },
+                    { name: "prefix", label: "Prefix Length", type: "number", placeholder: "e.g., 24" }
+                ],
+                notes: ["This workflow provisions all components needed for a single Layer 3 routed interface."],
+                generate: (p) => {
+                    const vs_name = `vs_${p.if_name}`;
+                    const sp_name = `sp_${p.port.replace('/', '_')}_${p.vlan_id}`;
+                    const cpu_if_name = `cpu_${p.if_name}`;
+
+                    return `!
+! ### Workflow: L3 Routed Interface Setup ###
+! Port: ${p.port}
+! VLAN: ${p.vlan_id}
+! IP Address: ${p.ip_address}/${p.prefix}
+!
+
+# Step 1: Create a virtual switch to host the L3 interface.
+virtual-switch create vs ${vs_name}
+
+# Step 2: Create the sub-port that will carry the L3 traffic.
+sub-port create sub-port ${sp_name} parent-port ${p.port} classifier-precedence 10
+sub-port add sub-port ${sp_name} class-element 1 vtag-stack ${p.vlan_id}
+
+# Step 3: Create the CPU sub-interface for packet processing.
+cpu-interface sub-interface create cpu-subinterface ${cpu_if_name} cpu-egress-l2-transform pop-1;stamp-8100.${p.vlan_id}.map
+
+# Step 4: Attach the physical and CPU interfaces to the virtual switch.
+virtual-switch interface attach sub-port ${sp_name} vs ${vs_name}
+virtual-switch interface attach cpu-subinterface ${cpu_if_name} vs ${vs_name}
+
+# Step 5: Create the logical IP interface on the virtual switch.
+interface create ip-interface ${p.if_name} ip ${p.ip_address}/${p.prefix} vs ${vs_name}
+
+! ### End of Workflow ###`;
+                }
             },
-            "Virtual Switch & Sub-port": {
-                "vs_create": { name: "Virtual Switch Create", base: "virtual-switch create vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
-                "vs_show": { name: "Virtual Switch Show", base: "virtual-switch show vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
-                "vs_delete": { name: "Virtual Switch Delete", base: "virtual-switch delete vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
-                "subport_create": { name: "Sub-port Create", base: "sub-port create sub-port <sp_name> parent-port <port_name> classifier-precedence <precedence>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "port_name", label: "Parent Port/LAG", type: "text", placeholder: "e.g., 11/6" }, { name: "precedence", label: "Precedence", type: "number", placeholder: "e.g., 10" }] },
-                "subport_add_vtag": { name: "Sub-port Add Vtag Stack", base: "sub-port add sub-port <sp_name> class-element <elem_id> vtag-stack <vlan_id>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "elem_id", label: "Class Element ID", type: "number", placeholder: "e.g., 1" }, { name: "vlan_id", label: "VLAN ID", type: "text", placeholder: "e.g., 200 or 1000:200" }] },
-                "subport_remove_vtag": { name: "Sub-port Remove Vtag Classifier", base: "sub-port remove sub-port <sp_name> class-element <elem_id>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "elem_id", label: "Class Element ID", type: "number", placeholder: "e.g., 1" }] },
-                "vs_attach_subport": { name: "VS Attach Sub-port", base: "virtual-switch interface attach sub-port <sp_name> vs <vs_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }, { name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
-                "vs_detach_subport": { name: "VS Detach Sub-port", base: "virtual-switch interface detach sub-port <sp_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }] },
-                "subport_delete": { name: "Sub-port Delete", base: "sub-port delete sub-port <sp_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_11/6" }] },
-                "mac_addr_show": { name: "MAC Address Show Table", base: "mac-addr show vs <vs_name>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
-                "mac_addr_aging_set": { name: "MAC Address Aging Set", base: "mac-addr aging set timeout <seconds>", params: [{ name: "seconds", label: "Timeout (seconds)", type: "number", placeholder: "e.g., 180" }] },
-            },
-            "Layer 3 & IP Interfaces": {
-                "ip_interface_create": { name: "IP Interface Create", base: "interface create ip-interface <if_name> ip <ip_address>/<prefix> vs <vs_name>", params: [{ name: "if_name", label: "Interface Name", type: "text", placeholder: "e.g., ipif_30" }, { name: "ip_address", label: "IP Address", type: "text", placeholder: "e.g., 200.1.0.30" }, { name: "prefix", label: "Prefix Length", type: "number", placeholder: "e.g., 30" }, { name: "vs_name", label: "Virtual Switch", type: "text", placeholder: "e.g., vs_30" }] },
-                "loopback_create": { name: "Loopback Interface Create", base: "interface create loopback <lb_name> ip <ip_address>", params: [{ name: "lb_name", label: "Loopback Name", type: "text", placeholder: "e.g., LB0" }, { name: "ip_address", label: "IP Address", type: "text", placeholder: "e.g., 10.1.1.5" }] },
-                "ip_route_add": { name: "IP Route Add", base: "ip route add destination <dest_prefix> gateway <gateway_ip>", params: [{ name: "dest_prefix", label: "Destination (x.x.x.x/y)", type: "text", placeholder: "e.g., 10.1.1.6/32" }, { name: "gateway_ip", label: "Gateway IP", type: "text", placeholder: "e.g., 200.1.0.30" }] },
-                "cpu_subinterface_create": { name: "CPU Sub-interface Create", base: "cpu-interface sub-interface create cpu-subinterface <cpu_if_name> cpu-egress-l2-transform push-8100.<vlan_id>.7", params: [{ name: "cpu_if_name", label: "CPU Interface Name", type: "text", placeholder: "e.g., cpu_sp_30" }, { name: "vlan_id", label: "Egress VLAN ID", type: "number", placeholder: "e.g., 100" }] },
-            },
-            "Routing Protocols (IS-IS, BGP)": {
-                "isis_instance_create": { name: "IS-IS Instance Create", base: "isis instance create isis-instance <instance_name> level <level> area <area_id>", params: [{ name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., ISIS1" }, { name: "level", label: "Level", type: "select", options: ["L1", "L2", "L1-L2"] }, { name: "area_id", label: "Area ID", type: "text", placeholder: "e.g., 49.0001" }] },
-                "isis_interface_attach": { name: "IS-IS Interface Attach", base: "isis interface attach ip-interface <if_name> isis-instance <instance_name> level <level>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }, { name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., ISIS1" }, { name: "level", label: "Level", type: "select", options: ["L1", "L2", "L1-L2"] }] },
-                 "bgp_instance_create": { name: "BGP Instance Create", base: "bgp instance create instance <instance_name> as <as_number>", params: [{ name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., myBGP" }, { name: "as_number", label: "AS Number", type: "number", placeholder: "e.g., 65001" }] },
-                "bgp_neighbor_create": { name: "BGP Neighbor Create", base: "bgp neighbor create <neighbor_ip> instance <instance_name> remote-as <remote_as>", params: [{ name: "neighbor_ip", label: "Neighbor IP", type: "text", placeholder: "e.g., 10.1.1.6" }, { name: "instance_name", label: "Instance Name", type: "text", placeholder: "e.g., myBGP" }, { name: "remote_as", label: "Remote AS", type: "number", placeholder: "e.g., 65002" }] }
-            },
-            "MPLS (LDP, RSVP-TE, VCs)": {
-                "mpls_tunnel_create_rsvp": { name: "MPLS Tunnel Create RSVP", base: "mpls tunnel create rsvp-ingress <tunnel_name> dest-ip <dest_ip>", params: [{ name: "tunnel_name", label: "Tunnel Name", type: "text", placeholder: "e.g., PTS5-to-PTS6" }, { name: "dest_ip", label: "Destination IP", type: "text", placeholder: "e.g., 10.1.1.6" }] },
-                "mpls_l2vpn_create_vc": { name: "MPLS L2VPN Create Dynamic VC", base: "mpls l2-vpn create dynamic-vc <vc_name> pw-id <pw_id> peer <peer_ip> te-tunnel <tunnel_name>", params: [{ name: "vc_name", label: "VC Name", type: "text", placeholder: "e.g., dvc_PTS5-PTS6" }, { name: "pw_id", label: "PW ID", type: "number", placeholder: "e.g., 10" }, { name: "peer_ip", label: "Peer IP", type: "text", placeholder: "e.g., 10.1.1.6" }, { name: "tunnel_name", label: "TE Tunnel Name", type: "text", placeholder: "e.g., PTS5-to-PTS6" }] },
-                "mpls_ping_vc": { name: "MPLS Ping VC", base: "mpls ping vc <vc_name>", params: [{ name: "vc_name", label: "VC Name", type: "text", placeholder: "e.g., vc_Lab5_65" }] },
-                "mpls_ping_tunnel": { name: "MPLS Ping RSVP Tunnel", base: "mpls ping rsvp-ingress <tunnel_name>", params: [{ name: "tunnel_name", label: "Tunnel Name", type: "text", placeholder: "e.g., PTS5-to-PTS6" }] },
-                "mpls_l2vpn_show": { name: "MPLS L2VPN Show", base: "mpls l2-vpn show", params: [] },
-                "ldp_enable": { name: "LDP Enable", base: "ldp enable", params: [] },
-                "rsvp_te_enable": { name: "RSVP-TE Enable", base: "rsvp-te enable", params: [] },
-                "rsvp_te_enable_interface": { name: "RSVP-TE Enable on Interface", base: "rsvp-te enable ip-interface <if_name>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }] },
-                "mpls_srlg_set": { name: "MPLS LDP Set SRLG on Interface", base: "mpls ldp interface set interface <if_name> srlg <srlg_value>", params: [{ name: "if_name", label: "IP Interface Name", type: "text", placeholder: "e.g., ipif_30" }, { name: "srlg_value", label: "SRLG Value", type: "number", placeholder: "e.g., 210" }] }
-            },
-            "OAM & Diagnostics": {
-                "cfm_enable": { name: "CFM Enable", base: "cfm enable", params: [] },
-                "cfm_service_create": { name: "CFM Service Create", base: "cfm service create vs <vs_name> name <service_name> ccm-interval <interval>", params: [{ name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }, { name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "interval", label: "CCM Interval", type: "select", options: ["10ms", "100ms", "1s", "10s"] }] },
-                "cfm_mep_create": { name: "CFM MEP Create", base: "cfm mep create service <service_name> sub-port <sp_name> mepid <mep_id>", params: [{ name: "service_name", label: "CFM Service Name", type: "text", placeholder: "e.g., cfm_LAG_1" }, { name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_LAG_1" }, { name: "mep_id", label: "MEP ID", type: "number", placeholder: "e.g., 300" }] },
-                "bfd_enable": { name: "BFD Enable", base: "bfd enable", params: [] },
-                "bfd_show": { name: "BFD Show Sessions", base: "bfd show", params: [] },
-                "lldp_enable": { name: "LLDP Enable", base: "lldp enable", params: [] },
-                "lldp_show_neighbors": { name: "LLDP Show Neighbors", base: "lldp show neighbors", params: [] },
-                "pm_create": { name: "PM Create Instance", base: "pm create <type> <name> pm-instance <pm_instance_name> profile-type <profile>", params: [{ name: "type", label: "Facility Type", type: "select", options: ["sub-port", "port-queue-group", "qos-flow"] }, { name: "name", label: "Facility Name", type: "text", placeholder: "e.g., sp_LAG_4" }, { name: "pm_instance_name", label: "PM Instance Name", type: "text", placeholder: "e.g., pm_sp_LAG_4" }, { name: "profile", label: "Profile Type", type: "select", options: ["BasicTxRx", "QueueGroup", "BasicRx"] }] },
-                "pm_show": { name: "PM Show Counts", base: "pm show facility <facility_aid>", params: [{ name: "facility_aid", label: "Facility AID", type: "text", placeholder: "e.g., ETTP-1-11-4" }] }
-            },
-            "Ring Protection (G.8032)": {
-                "ring_logical_create": { name: "Ring Protection Logical Ring Create", base: "ring-protection logical-ring create logical-ring-name <lr_name> ring-id <id> west-port <west_port> east-port <east_port>", params: [{ name: "lr_name", label: "Logical Ring Name", type: "text", placeholder: "e.g., lr_Lab4_1" }, { name: "id", label: "Ring ID", type: "number", placeholder: "e.g., 2" }, { name: "west_port", label: "West Port", type: "text", placeholder: "e.g., 11/1" }, { name: "east_port", label: "East Port", type: "text", placeholder: "e.g., 3/1-1" }] },
-                "ring_virtual_create": { name: "Ring Protection Virtual Ring Create", base: "ring-protection virtual-ring create virtual-ring-name <vr_name> logical-ring <lr_name> raps-vid <vlan_id>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "lr_name", label: "Logical Ring Name", type: "text", placeholder: "e.g., lr_Lab4_1" }, { name: "vlan_id", label: "RAPS VID", type: "number", placeholder: "e.g., 1" }] },
-                "ring_virtual_add_vs": { name: "Ring Protection Virtual Ring Add VS", base: "ring-protection virtual-ring add ring <vr_name> vs <vs_name>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "vs_name", label: "VS Name", type: "text", placeholder: "e.g., vs_Lab1_1" }] },
-                "ring_set_rpl": { name: "Ring Protection Set RPL Owner", base: "ring-protection virtual-ring set ring <vr_name> <port_side>-port-rpl owner", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }, { name: "port_side", label: "Port Side", type: "select", options: ["east", "west"] }] },
-                "ring_show": { name: "Ring Protection Show Virtual Ring", base: "ring-protection virtual-ring show ring <vr_name>", params: [{ name: "vr_name", label: "Virtual Ring Name", type: "text", placeholder: "e.g., vr_Lab4_1" }] }
-            },
-            "Quality of Service (QoS)": {
-                 "qos_meter_profile_create": { name: "QoS Metering Profile Create", base: "traffic-services metering meter-profile create profile <profile_name> cir <cir_kbps> cbs <cbs_kbytes>", params: [{ name: "profile_name", label: "Profile Name", type: "text", placeholder: "e.g., CIR5_1" }, { name: "cir_kbps", label: "CIR (kbps)", type: "number", placeholder: "e.g., 1000000" }, { name: "cbs_kbytes", label: "CBS (kBytes)", type: "number", placeholder: "e.g., 64" }] },
-                "qos_meter_profile_delete": { name: "QoS Metering Profile Delete", base: "traffic-services metering meter-profile delete profile <profile_name>", params: [{ name: "profile_name", label: "Profile Name", type: "text", placeholder: "e.g., CIR5_1" }] },
-                "subport_set_meter_profile": { name: "Sub-port Set Meter Profile", base: "sub-port set sub-port <sp_name> ingress-meter-profile <profile_name>", params: [{ name: "sp_name", label: "Sub-port Name", type: "text", placeholder: "e.g., sp_LAG_1" }, { name: "profile_name", label: "Profile Name", type: "text", placeholder: "e.g., CIR5_1" }] },
-                "qos_flow_create": { name: "QoS Flow Create", base: "qos-flow create qos-flow-sub-port <qos_flow_name> parent-sub-port <sp_name> classifier-precedence <precedence>", params: [{ name: "qos_flow_name", label: "QoS Flow Name", type: "text", placeholder: "e.g., qosflsp_11/6" }, { name: "sp_name", label: "Parent Sub-port", type: "text", placeholder: "e.g., sp_11/6" }, { name: "precedence", label: "Precedence", type: "number", placeholder: "e.g., 110" }] }
-            },
-             "Security & Users": {
-                "user_create": { name: "User Create", base: "user create user-id <user_id> password", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., newtech" }] },
-                "user_set_privilege": { name: "User Set Privilege", base: "user set user-id <user_id> privilege <level>", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., newtech" }, { name: "level", label: "Privilege Level", type: "select", options: ["super", "admin", "limited", "diag"] }] },
-                "user_set_timeout": { name: "User Set Timeout", base: "user set user-id <user_id> automatic-timeout on timeout-interval <minutes>", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., newtech" }, { name: "minutes", label: "Timeout (minutes)", type: "number", placeholder: "e.g., 30" }] },
-                "user_show": { name: "User Show Active", base: "user show active-users", params: [] },
-                "user_delete": { name: "User Delete", base: "user delete user-id <user_id>", params: [{ name: "user_id", label: "User ID", type: "text", placeholder: "e.g., oldtech" }] }
+            "mpls_l2vpn_p2p": {
+                name: "MPLS L2VPN P2P Service (VPWS)",
+                 params: [
+                    { name: "service_name", label: "Service Name", type: "text", placeholder: "e.g., CustA_VPWS" },
+                    { name: "port", label: "Local Customer Port", type: "text", placeholder: "e.g., 4/1" },
+                    { name: "vlan_id", label: "Local Customer VLAN ID", type: "number", placeholder: "e.g., 300" },
+                    { name: "pw_id", label: "Pseudowire ID", type: "number", placeholder: "e.g., 3001 (must match peer)" },
+                    { name: "peer_ip", label: "Remote PE Router IP", type: "text", placeholder: "e.g., 10.1.1.2" },
+                    { name: "tunnel_name", label: "Underlying TE Tunnel Name", type: "text", placeholder: "e.g., Tunnel_to_PE2" }
+                ],
+                notes: ["This workflow creates a point-to-point L2VPN service (VPWS) over an existing MPLS TE tunnel.", "Ensure the underlying TE tunnel to the peer is already provisioned and operational.", "The Pseudowire ID must be identical on both PE routers for the service to come up."],
+                generate: (p) => {
+                     const vs_name = `vs_${p.service_name}`;
+                     const sp_name = `sp_${p.port.replace('/', '_')}_${p.vlan_id}`;
+                     const vc_name = `dvc_${p.service_name}`;
+                    return `!
+! ### Workflow: MPLS L2VPN P2P Service (VPWS) ###
+! Service: ${p.service_name}
+! Local Port: ${p.port} (VLAN ${p.vlan_id})
+! Peer: ${p.peer_ip} (PW ID: ${p.pw_id})
+!
+
+# Step 1: Create a virtual switch for the service.
+virtual-switch create vs ${vs_name}
+
+# Step 2: Create and configure the customer-facing sub-port.
+sub-port create sub-port ${sp_name} parent-port ${p.port} classifier-precedence 10
+sub-port add sub-port ${sp_name} class-element 1 vtag-stack ${p.vlan_id}
+
+# Step 3: Create the dynamic virtual circuit (pseudowire).
+mpls l2-vpn create dynamic-vc ${vc_name} pw-id ${p.pw_id} peer ${p.peer_ip} te-tunnel ${p.tunnel_name}
+
+# Step 4: Attach the customer sub-port and the MPLS VC to the virtual switch.
+virtual-switch interface attach sub-port ${sp_name} vs ${vs_name}
+virtual-switch interface attach mpls-vc ${vc_name} vs ${vs_name}
+
+! ### End of Workflow ###`;
+                }
             }
         };
 
-        const searchInput = document.getElementById('search-input');
-        const categorySelect = document.getElementById('category-select');
-        const commandSelect = document.getElementById('command-select');
+        const workflowSelect = document.getElementById('workflow-select');
         const paramsForm = document.getElementById('params-form');
+        const warningsContainer = document.getElementById('warnings-container');
         const generateBtn = document.getElementById('generate-btn');
         const clearBtn = document.getElementById('clear-btn');
         const outputCommand = document.getElementById('output-command');
         const copyBtn = document.getElementById('copy-btn');
         
-        function populateCategories(filter = '') {
-            const currentCategory = categorySelect.value;
-            categorySelect.innerHTML = '<option value="">-- All Categories --</option>';
-            const filteredCategories = new Set();
-
-            if (filter) {
-                Object.entries(commandDb).forEach(([category, commands]) => {
-                    Object.values(commands).forEach(command => {
-                        if (command.name.toLowerCase().includes(filter) || command.base.toLowerCase().includes(filter)) {
-                            filteredCategories.add(category);
-                        }
-                    });
-                });
-            }
-
-            const source = filter ? Array.from(filteredCategories).sort() : Object.keys(commandDb).sort();
-            
-            source.forEach(category => {
+        function populateWorkflows() {
+            Object.keys(workflowDb).forEach(key => {
+                const workflow = workflowDb[key];
                 const option = document.createElement('option');
-                option.value = category;
-                option.textContent = category;
-                categorySelect.appendChild(option);
+                option.value = key;
+                option.textContent = workflow.name;
+                workflowSelect.appendChild(option);
             });
-            
-            if (filter) {
-                 categorySelect.value = ""; // Default to all categories when searching
-            } else if (Array.from(categorySelect.options).some(opt => opt.value === currentCategory)) {
-                 categorySelect.value = currentCategory;
+        }
+
+        function displayWarnings(workflow) {
+            warningsContainer.innerHTML = '';
+            if (workflow && workflow.notes) {
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'warning-box';
+                let notesHtml = '<strong>Notes & Warnings:</strong><ul>';
+                workflow.notes.forEach(note => {
+                    notesHtml += `<li class="list-disc ml-5">${note}</li>`;
+                });
+                notesHtml += '</ul>';
+                warningDiv.innerHTML = notesHtml;
+                warningsContainer.appendChild(warningDiv);
             }
-            populateCommands(filter);
         }
         
-        function populateCommands(filter = '') {
-            const selectedCategory = categorySelect.value;
-            commandSelect.innerHTML = '<option value="">-- Select a Command --</option>';
-            commandSelect.disabled = true;
+        function toggleConditionalFields() {
+            const selectedWorkflowKey = workflowSelect.value;
+            if (!selectedWorkflowKey) return;
+            const workflow = workflowDb[selectedWorkflowKey];
 
-            const commandSource = selectedCategory ? { [selectedCategory]: commandDb[selectedCategory] } : commandDb;
-            
-            let commandList = [];
-            Object.keys(commandSource).forEach(category => {
-                const commands = commandSource[category];
-                Object.keys(commands).forEach(commandKey => {
-                    const command = commands[commandKey];
-                    if(filter === '' || command.name.toLowerCase().includes(filter) || command.base.toLowerCase().includes(filter)) {
-                        commandList.push({ key: commandKey, category: category, name: command.name });
+            workflow.params.forEach(param => {
+                if (param.condition) {
+                    const conditionCheckbox = document.getElementById(`param-${param.condition}`);
+                    const targetField = document.getElementById(`param-${param.name}`).parentElement;
+                    if (conditionCheckbox && targetField) {
+                        targetField.style.display = conditionCheckbox.checked ? 'block' : 'none';
                     }
-                });
+                }
             });
-
-            commandList.sort((a,b) => a.name.localeCompare(b.name));
-
-            commandList.forEach(cmd => {
-                const option = document.createElement('option');
-                option.value = cmd.key;
-                option.dataset.category = cmd.category;
-                option.textContent = `${cmd.name} (${cmd.category})`;
-                commandSelect.appendChild(option);
-            });
-            
-             if(commandSelect.options.length > 1) {
-                 commandSelect.disabled = false;
-             }
         }
-        
-        // Initial Population
-        populateCategories();
 
-        // Event Listeners
-         searchInput.addEventListener('input', () => {
-            const searchTerm = searchInput.value.toLowerCase();
-            populateCategories(searchTerm);
-        });
+        populateWorkflows();
 
-        categorySelect.addEventListener('change', () => {
-            populateCommands(searchInput.value.toLowerCase());
+        workflowSelect.addEventListener('change', () => {
+            const selectedWorkflowKey = workflowSelect.value;
             paramsForm.innerHTML = '';
+            warningsContainer.innerHTML = '';
             outputCommand.textContent = '';
             copyBtn.style.display = 'none';
-            generateBtn.disabled = true;
-        });
 
-        commandSelect.addEventListener('change', () => {
-            const selectedCommandKey = commandSelect.value;
-            if (!selectedCommandKey) {
-                paramsForm.innerHTML = '';
-                outputCommand.textContent = '';
-                copyBtn.style.display = 'none';
+            if (!selectedWorkflowKey) {
                 generateBtn.disabled = true;
                 return;
-            };
-
-            const selectedOption = commandSelect.options[commandSelect.selectedIndex];
-            const selectedCategory = selectedOption.dataset.category;
-            paramsForm.innerHTML = '';
-            outputCommand.textContent = '';
-            copyBtn.style.display = 'none';
-
-            if (selectedCommandKey && selectedCategory) {
-                if (categorySelect.value !== selectedCategory) {
-                    categorySelect.value = selectedCategory;
-                }
-                
-                generateBtn.disabled = false;
-                const command = commandDb[selectedCategory][selectedCommandKey];
-                
-                if (command.params.length === 0) {
-                     generateBtn.click(); // Auto-generate if no params
-                } else {
-                    command.params.forEach(param => {
-                        let inputHtml = '';
-                        if (param.type === 'select') {
-                            const optionsHtml = param.options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-                            inputHtml = `<select id="param-${param.name}" class="input-field">${optionsHtml}</select>`;
-                        } else {
-                            inputHtml = `<input type="${param.type}" id="param-${param.name}" class="input-field" placeholder="${param.placeholder || ''}">`;
-                        }
-                        
-                        const paramDiv = document.createElement('div');
-                        paramDiv.innerHTML = `<label for="param-${param.name}" class="label">${param.label}</label>${inputHtml}`;
-                        paramsForm.appendChild(paramDiv);
-                    });
-                }
-            } else {
-                generateBtn.disabled = true;
             }
+
+            generateBtn.disabled = false;
+            const workflow = workflowDb[selectedWorkflowKey];
+            displayWarnings(workflow);
+
+            workflow.params.forEach(param => {
+                let inputHtml = '';
+                const paramDiv = document.createElement('div');
+
+                if (param.type === 'checkbox') {
+                    inputHtml = `<label class="checkbox-label"><input type="checkbox" id="param-${param.name}"><span>${param.label}</span></label>`;
+                    paramDiv.innerHTML = inputHtml;
+                } else {
+                    if (param.type === 'select') {
+                        const optionsHtml = param.options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                        inputHtml = `<select id="param-${param.name}" class="input-field">${optionsHtml}</select>`;
+                    } else {
+                        inputHtml = `<input type="${param.type}" id="param-${param.name}" class="input-field" placeholder="${param.placeholder || ''}">`;
+                    }
+                    paramDiv.innerHTML = `<label for="param-${param.name}" class="label">${param.label}</label>${inputHtml}`;
+                }
+                paramsForm.appendChild(paramDiv);
+            });
+            
+            toggleConditionalFields(); // Initial check
+            paramsForm.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                 checkbox.addEventListener('change', toggleConditionalFields);
+            });
         });
 
         generateBtn.addEventListener('click', () => {
-            const selectedOption = commandSelect.options[commandSelect.selectedIndex];
-            if (!selectedOption || !selectedOption.value) return;
+            const selectedWorkflowKey = workflowSelect.value;
+            if (!selectedWorkflowKey) return;
 
-            const selectedCategory = selectedOption.dataset.category;
-            const selectedCommandKey = selectedOption.value;
+            const workflow = workflowDb[selectedWorkflowKey];
+            const params = {};
+            let allParamsFilled = true;
 
-            if (!selectedCategory || !selectedCommandKey) return;
-
-            const command = commandDb[selectedCategory][selectedCommandKey];
-            let finalCommand = command.base;
-
-            command.params.forEach(param => {
+            workflow.params.forEach(param => {
                 const inputElement = document.getElementById(`param-${param.name}`);
                 if (inputElement) {
-                    const value = inputElement.value;
-                    const placeholder = `<${param.name}>`;
-                    finalCommand = finalCommand.replace(placeholder, value || param.placeholder || "");
+                     if (param.type === 'checkbox') {
+                        params[param.name] = inputElement.checked;
+                    } else {
+                        params[param.name] = inputElement.value;
+                        const isVisible = inputElement.parentElement.style.display !== 'none';
+                        if (!inputElement.value && isVisible) {
+                            allParamsFilled = false;
+                        }
+                    }
                 }
             });
 
-            outputCommand.textContent = finalCommand;
+            if (!allParamsFilled) {
+                 outputCommand.textContent = "Please fill in all required parameters.";
+                 copyBtn.style.display = 'none';
+                 return;
+            }
+
+            const script = workflow.generate(params);
+            outputCommand.textContent = script;
             copyBtn.style.display = 'block';
             copyBtn.textContent = 'Copy';
             copyBtn.classList.remove('copied');
@@ -346,26 +338,18 @@
         
         copyBtn.addEventListener('click', () => {
             const textToCopy = outputCommand.textContent;
-            const textArea = document.createElement('textarea');
-            textArea.value = textToCopy;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
+            navigator.clipboard.writeText(textToCopy).then(() => {
                 copyBtn.textContent = 'Copied!';
                 copyBtn.classList.add('copied');
-            } catch (err) {
+            }, (err) => {
                 console.error('Failed to copy text: ', err);
-            }
-            document.body.removeChild(textArea);
+            });
         });
 
         clearBtn.addEventListener('click', () => {
-            searchInput.value = '';
-            populateCategories(); 
-            commandSelect.innerHTML = '<option value="">-- Select a Command --</option>';
-            commandSelect.disabled = true;
+            workflowSelect.value = '';
             paramsForm.innerHTML = '';
+            warningsContainer.innerHTML = '';
             outputCommand.textContent = '';
             generateBtn.disabled = true;
             copyBtn.style.display = 'none';
